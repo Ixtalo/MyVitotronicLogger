@@ -37,6 +37,8 @@ Requirements
 	* Arduino (of course)
 	* ESP8266
 	* VitoWiFi, https://github.com/bertmelis/VitoWiFi
+		* Version 1.0.2 from 10.11.2018
+		* https://github.com/bertmelis/VitoWiFi/tree/5d8a2d5b270df575b2cb3b8847567947bac362e9
 * Optional: RS232 USB cable for Serial1 observation (attach to D4)
 
 
