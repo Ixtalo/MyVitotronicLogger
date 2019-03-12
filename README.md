@@ -29,6 +29,17 @@ Solution Approach
 
 
 
+Requirements
+------------
+* ESP8266, e.g., Wemos D1 Mini
+* OptoLink interface: https://github.com/openv/openv/wiki/Bauanleitung-ESP8266
+* Libraries
+	* Arduino (of course)
+	* ESP8266
+	* VitoWiFi
+* Optional: RS232 USB cable for Serial1 observation (attach to D4)
+
+
 
 Links
 -----
