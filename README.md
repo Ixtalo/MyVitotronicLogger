@@ -36,8 +36,62 @@ Requirements
 * Libraries
 	* Arduino (of course)
 	* ESP8266
-	* VitoWiFi
+	* VitoWiFi, https://github.com/bertmelis/VitoWiFi
 * Optional: RS232 USB cable for Serial1 observation (attach to D4)
+
+
+
+Implementations
+---------------
+
+### vitowifitests
+Testing project to test the OptoLink interface.
+1. Attach to opto coupler 
+2. Attach RS232 USB cable to D4 to listen for Serial1 messages
+
+Example output:
+```
+temperature - boilerTemp is 32.4
+temperature - STS1 is 48.5
+temperature - RTS is 20.0
+temperature - AGTS is 20.0
+temperature - RLTS is 20.0
+temperature - VLTS is 20.0
+temperature - setRoomTemp is 309.2
+temperature - setRoomReducedTemp is 513.2
+burner - runHours is 10272.3
+burner - starts is 199182
+operation - currentOperatingMode is 2
+pump - a1m1Pump is true
+pump - storePump is false
+pump - circuitPump is false
+```
+
+
+### vitowifimqtt
+Working Arduino project.
+Sends collected data from OptoLink interface to MQTT server.  
+
+Example output:
+```
+/esp/VitoWiFi/ip 192.168.1.108
+/esp/VitoWiFi/outsideTemp 8.9
+/esp/VitoWiFi/boilerTemp 56.6
+/esp/VitoWiFi/STS1 47.7
+/esp/VitoWiFi/RTS 20.0
+/esp/VitoWiFi/AGTS 20.0
+/esp/VitoWiFi/RLTS 20.0
+/esp/VitoWiFi/VLTS 20.0
+/esp/VitoWiFi/setRoomTemp 309.2
+/esp/VitoWiFi/setRoomReducedTemp 538.8
+/esp/VitoWiFi/runHours 10274.3
+/esp/VitoWiFi/starts 199237
+/esp/VitoWiFi/currentOperatingMode 2
+/esp/VitoWiFi/a1m1Pump true
+/esp/VitoWiFi/storePump false
+/esp/VitoWiFi/circuitPump false
+```
+
 
 
 
