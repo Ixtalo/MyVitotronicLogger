@@ -16,8 +16,14 @@
 #include "/home/stc/Work/elektronik/WifiCredentials.h"
 
 // MQTT IP address
-const char *mqtt_server = "192.168.1.7";
+const char *mqtt_server = "192.168.3.1";
 
+
+// WiFi static IP configuration (instead of DHCP)
+IPAddress staticIP(192, 168, 3, 34);
+IPAddress gateway(192, 168, 3, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress dns(gateway);
 
 
 
@@ -103,7 +109,11 @@ pump - circuitPump is false
 
 bool setup_wifi(uint8 n_attempts = 3)
 {
+  WiFi.disconnect();
   delay(10);
+  WiFi.mode(WIFI_STA);
+  WiFi.hostname("ESP-VitoWiFi");
+  WiFi.config(staticIP, subnet, gateway, dns);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   for (size_t i = 0; i < n_attempts; i++)
   {
@@ -166,15 +176,14 @@ void globalCallbackHandler(const IDatapoint &dp, DPValue value)
 void setup()
 {
   // initial grace wait time
-  delay(5 * 1000);
+  delay(2 * 1000);
 
   // initialize Serial1 (Serial*ONE*) for logging/status output
   // (not Serial/Serial0 because it is used for communication with boiler!)
   Serial1.begin(115200);
 
   // WiFi setup/connection
-  // try 10 times
-  if (setup_wifi(3))
+  if (setup_wifi(10))
   {
 
     // MQTT setup/connection
