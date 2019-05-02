@@ -94,6 +94,15 @@ Example output:
 /esp/VitoWiFi/circuitPump false
 ```
 
+### Pictures
+
+![Breadboard Prototype](IMG_20190312_212939743.jpg "Breadboard Prototype")
+![Breadboard Prototype](IMG_20190312_212953104.jpg "Breadboard Prototype")
+![Sensor](IMG_20190312_212944589.jpg "Breadboard Prototype")
+ 
+
+
+
 
 
 
