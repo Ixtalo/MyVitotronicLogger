@@ -9,10 +9,10 @@ AST, 12.03.2019
 
 Motivation
 ----------
-We have a Vissmann boiler with a Vitotronic 200 KW1 (V200KW1), Witterungsgeführte Kesselregelung für gleitend abgesenkte Kesselwassertemperatur.
-* How much energy is consumed? 
+We have a Vissmann boiler with a Vitotronic 200 KW1 (V200KW1), Witterungsgeführte Kesselregelung für gleitend abgesenkte Kesselwassertemperatur.  
+* How much energy is consumed?
 * How to monitor the boiler's temperatures?
-* What is the boiler doing over time? 
+* What is the boiler doing over time?
 * How to interface with the boiler?
 
 
@@ -20,33 +20,36 @@ Solution Approach
 -----------------
 * Use the optical interface.
 	* <https://github.com/openv/openv/wiki/Die-Optolink-Schnittstelle>
-	* KW Protocol, https://github.com/openv/openv/wiki/Protokoll-KW
-* Use Arduino ESP8266 with a DIY interface, see https://github.com/openv/openv/wiki/Bauanleitung-ESP8266
-* Use fantastic VitoWiFi
+	* KW Protocol, <https://github.com/openv/openv/wiki/Protokoll-KW>
+* Use Arduino ESP8266 with a DIY optocoupler interface, see <https://github.com/openv/openv/wiki/Bauanleitung-ESP8266>
+* Use the great VitoWiFi
 	* Arduino Library for ESP8266 to communicate with Viessmann boilers using a (DIY) serial optolink.
 	* <https://github.com/bertmelis/VitoWiFi.git>
-	* based on fantastic OpenV library
+	* based on the fantastic OpenV library
 
 
 
 Requirements
 ------------
 * ESP8266, e.g., Wemos D1 Mini
-* OptoLink interface: https://github.com/openv/openv/wiki/Bauanleitung-ESP8266
-* Libraries
-	* Arduino (of course)
-	* ESP8266
+* OptoLink interface: <https://github.com/openv/openv/wiki/Bauanleitung-ESP8266>
+* Libraries for:
+	* Arduino, e.g., *Arduino IDE*
+	* ESP8266 / Wemos D1 Mini
 	* VitoWiFi, <https://github.com/bertmelis/VitoWiFi>
-		* Tested version was [Version 1.0.2 from 10.11.2018](https://github.com/bertmelis/VitoWiFi/tree/5d8a2d5b270df575b2cb3b8847567947bac362e9)
+		* Tested working version was [Version 1.0.2 from 10.11.2018](https://github.com/bertmelis/VitoWiFi/tree/5d8a2d5b270df575b2cb3b8847567947bac362e9)
 * Optional: RS232 USB cable for Serial1 observation (attach to D4)
 
 
 
-Circuit
--------
+Circuit / Wiring
+----------------
+![Breadboard](doc/WemosD1MiniVitoOptocoupler_bb.jpg)  
 
-![Wiring](VitoWiFi/doc/circuit.png)  
-(See also https://github.com/bertmelis/VitoWiFi/blob/master/doc/circuit.png)  
+![Schematic](doc/WemosD1MiniVitoOptocoupler_schem.jpg)
+
+![Wiring](doc/OptolinkESP8266.png)  
+(See also https://github.com/openv/openv/wiki/Bauanleitung-ESP8266)  
 
 ![Sensor](doc/optocoupler.jpg "Breadboard Prototype")
 
@@ -121,5 +124,5 @@ Links
 * [OpenV](https://github.com/openv/openv/wiki/)
 * [Anbindung der Heizungssteuerung über Optolink](https://www.harrykellner.de/index.php/projekte2/81-optolink)
 * [Talking to Viessmann Vitodens 200](https://www.edom-plc.pl/index.php/en/1-wire-i-rpi-en/175-komunikacja-z-viessmann-em-vitodens-200)
-* http://www.rainer-rebhan.de/proj_vvt_manager.html
+* <http://www.rainer-rebhan.de/proj_vvt_manager.html>
 
