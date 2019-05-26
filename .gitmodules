@@ -1,0 +1,3 @@
+[submodule "VitoWiFi"]
+	path = VitoWiFi
+	url = https://github.com/bertmelis/VitoWiFi.git

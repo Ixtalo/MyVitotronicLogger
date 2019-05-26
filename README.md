@@ -19,12 +19,12 @@ We have a Vissmann boiler with a Vitotronic 200 KW1 (V200KW1), Witterungsgeführ
 Solution Approach
 -----------------
 * Use the optical interface.
-	* https://github.com/openv/openv/wiki/Die-Optolink-Schnittstelle
+	* <https://github.com/openv/openv/wiki/Die-Optolink-Schnittstelle>
 	* KW Protocol, https://github.com/openv/openv/wiki/Protokoll-KW
 * Use Arduino ESP8266 with a DIY interface, see https://github.com/openv/openv/wiki/Bauanleitung-ESP8266
 * Use fantastic VitoWiFi
 	* Arduino Library for ESP8266 to communicate with Viessmann boilers using a (DIY) serial optolink.
-	* https://github.com/bertmelis/VitoWiFi.git
+	* <https://github.com/bertmelis/VitoWiFi.git>
 	* based on fantastic OpenV library
 
 
@@ -36,10 +36,21 @@ Requirements
 * Libraries
 	* Arduino (of course)
 	* ESP8266
-	* VitoWiFi, https://github.com/bertmelis/VitoWiFi
-		* Version 1.0.2 from 10.11.2018
-		* https://github.com/bertmelis/VitoWiFi/tree/5d8a2d5b270df575b2cb3b8847567947bac362e9
+	* VitoWiFi, <https://github.com/bertmelis/VitoWiFi>
+		* Tested version was [Version 1.0.2 from 10.11.2018](https://github.com/bertmelis/VitoWiFi/tree/5d8a2d5b270df575b2cb3b8847567947bac362e9)
 * Optional: RS232 USB cable for Serial1 observation (attach to D4)
+
+
+
+Circuit
+-------
+
+![Wiring](VitoWiFi/doc/circuit.png)  
+(See also https://github.com/bertmelis/VitoWiFi/blob/master/doc/circuit.png)  
+
+![Sensor](doc/optocoupler.jpg "Breadboard Prototype")
+
+
 
 
 
@@ -96,9 +107,8 @@ Example output:
 
 ### Pictures
 
-![Breadboard Prototype](IMG_20190312_212939743.jpg "Breadboard Prototype")
-![Breadboard Prototype](IMG_20190312_212953104.jpg "Breadboard Prototype")
-![Sensor](IMG_20190312_212944589.jpg "Breadboard Prototype")
+![Breadboard Prototype](doc/breadboard1.jpg "Breadboard Prototype")
+![Breadboard Prototype](doc/breadboard2.jpg "Breadboard Prototype")
  
 
 
@@ -108,8 +118,8 @@ Example output:
 
 Links
 -----
-* OpenV, https://github.com/openv/openv/wiki/
-* https://www.harrykellner.de/index.php/projekte2/81-optolink
-* https://www.edom-plc.pl/index.php/en/1-wire-i-rpi-en/175-komunikacja-z-viessmann-em-vitodens-200
+* [OpenV](https://github.com/openv/openv/wiki/)
+* [Anbindung der Heizungssteuerung über Optolink](https://www.harrykellner.de/index.php/projekte2/81-optolink)
+* [Talking to Viessmann Vitodens 200](https://www.edom-plc.pl/index.php/en/1-wire-i-rpi-en/175-komunikacja-z-viessmann-em-vitodens-200)
 * http://www.rainer-rebhan.de/proj_vvt_manager.html
 
