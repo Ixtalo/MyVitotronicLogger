@@ -112,8 +112,9 @@ Example output:
 
 ![Breadboard Prototype](doc/breadboard1.jpg "Breadboard Prototype")
 ![Breadboard Prototype](doc/breadboard2.jpg "Breadboard Prototype")
- 
 
+My setup and wiring:
+![My setup](doc/MyVitotronicLogger_Setup.jpg)
 
 
 
