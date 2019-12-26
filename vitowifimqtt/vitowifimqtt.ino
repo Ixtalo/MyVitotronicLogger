@@ -2,12 +2,13 @@
  * MyVitotronicLogger
  * Vissmann boiler logger with DIY OptoLink interface.  
  * AST, 12.03.2019
+ * Last update: 26.12.2019 (MQTT authentication)
  * 
  * Based on https://github.com/bertmelis/VitoWiFi.git
  * 
  */
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h> // MQTT
+#include <PubSubClient.h> // MQTT, https://pubsubclient.knolleary.net/
 #include <VitoWiFi.h> // https://github.com/bertmelis/VitoWiFi.git
 
 // declare WIFI_SSID in external header file
@@ -15,12 +16,16 @@
 // const char* WIFI_PASS = "...";
 #include "/home/stc/Work/elektronik/WifiCredentials.h"
 
-// MQTT IP address
-const char *mqtt_server = "192.168.3.1";
+// MQTT
+// const char* MQTT_HOST = "192.168.3.1";
+// const unsigned int MQTT_PORT = 1883;
+// const char* MQTT_USER = "...";
+// const char* MQTT_PASS = "...";
+#include "/home/stc/Work/elektronik/EspKlingelMqttSettings.h"
 
 
 // WiFi static IP configuration (instead of DHCP)
-IPAddress staticIP(192, 168, 3, 34);
+IPAddress staticIP(192, 168, 3, 9);
 IPAddress gateway(192, 168, 3, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress dns(gateway);
@@ -143,7 +148,7 @@ bool mqtt_connect(uint8 n_attempts = 3)
     {
       return true;
     }
-    if (client.connect(clientId.c_str()))
+    if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS))
     {
       Serial1.println(F("connected"));
     }
@@ -187,7 +192,7 @@ void setup()
   {
 
     // MQTT setup/connection
-    client.setServer(mqtt_server, 1883);
+    client.setServer(MQTT_HOST, MQTT_PORT);
     if (mqtt_connect(3))
     {
       client.publish("/esp/VitoWiFi/ip", WiFi.localIP().toString().c_str());
