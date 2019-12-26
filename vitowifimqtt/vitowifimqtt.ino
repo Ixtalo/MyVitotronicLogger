@@ -21,11 +21,11 @@
 // const unsigned int MQTT_PORT = 1883;
 // const char* MQTT_USER = "...";
 // const char* MQTT_PASS = "...";
-#include "EspKlingelMqttSettings.h"
+#include "SensorNodeMqttSettings.h"
 
 
 // WiFi static IP configuration (instead of DHCP)
-IPAddress staticIP(192, 168, 3, 9);
+IPAddress staticIP(192, 168, 3, 8);
 IPAddress gateway(192, 168, 3, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress dns(gateway);
