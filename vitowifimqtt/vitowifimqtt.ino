@@ -185,6 +185,8 @@ void setup()
 
   // initialize Serial1 (Serial*ONE*) for logging/status output
   // (not Serial/Serial0 because it is used for communication with boiler!)
+  // Serial1 uses UART1 which is a transmit-only UART.
+  // UART1 TX pin is D4 (GPIO2, LED!!).
   Serial1.begin(115200);
 
   // WiFi setup/connection

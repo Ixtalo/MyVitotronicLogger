@@ -55,15 +55,29 @@ Circuit / Wiring
 
 
 
+Debugging
+---------------
+1. Attach to opto coupler 
+2. Attach RS232 USB cable to D4 to listen for Serial1 messages. **Serial1/UART1 TX pin is D4.**
+
+**Do not connect to RX/TX because those are reserved for opto-coupler communication!**
+
+For debugging the Serial1 Arduino software UART is being used.
+
+  > Serial1.begin(115200);
+
+All logging and status messages are being print using `Serial1.print`.  
+Serial1 uses UART1 which is a transmit-only UART.  
 
 
-Implementations
+
+Development
 ---------------
 
 ### vitowifitests
 Testing project to test the OptoLink interface.
 1. Attach to opto coupler 
-2. Attach RS232 USB cable to D4 to listen for Serial1 messages
+2. Attach RS232 USB cable to D4 to listen for Serial1 messages. **Serial1/UART1 TX pin is D4.**
 
 Example output:
 ```
