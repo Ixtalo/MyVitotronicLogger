@@ -14,14 +14,14 @@
 // declare WIFI_SSID in external header file
 // const char* WIFI_SSID = "...";
 // const char* WIFI_PASS = "...";
-#include "/home/stc/Work/elektronik/WifiCredentials.h"
+#include "/home/stc/Work/SmartHomeWorkspace/WifiCredentials.h"
 
 // MQTT
 // const char* MQTT_HOST = "192.168.3.1";
 // const unsigned int MQTT_PORT = 1883;
 // const char* MQTT_USER = "...";
 // const char* MQTT_PASS = "...";
-#include "/home/stc/Work/elektronik/SensorNodeMqttSettings.h"
+#include "/home/stc/Work/SmartHomeWorkspace/SensorNodeMqttSettings.h"
 
 
 // WiFi static IP configuration (instead of DHCP)
@@ -185,6 +185,8 @@ void setup()
 
   // initialize Serial1 (Serial*ONE*) for logging/status output
   // (not Serial/Serial0 because it is used for communication with boiler!)
+  // Serial1 uses UART1 which is a transmit-only UART.
+  // UART1 TX pin is D4 (GPIO2, LED!!).
   Serial1.begin(115200);
 
   // WiFi setup/connection
