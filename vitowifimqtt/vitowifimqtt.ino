@@ -9,7 +9,8 @@
  */
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h> // MQTT, https://pubsubclient.knolleary.net/
-#include <VitoWiFi.h> // https://github.com/bertmelis/VitoWiFi.git
+#include <VitoWiFi.h>     // https://github.com/bertmelis/VitoWiFi.git
+#include <ArduinoOTA.h>
 
 // declare WIFI_SSID in external header file
 // const char* WIFI_SSID = "...";
@@ -23,15 +24,11 @@
 // const char* MQTT_PASS = "...";
 #include "/home/stc/Work/SmartHomeWorkspace/SensorNodeMqttSettings.h"
 
-
 // WiFi static IP configuration (instead of DHCP)
 IPAddress staticIP(192, 168, 3, 8);
 IPAddress gateway(192, 168, 3, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress dns(gateway);
-
-
-
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -112,6 +109,11 @@ pump - circuitPump is false
 
 */
 
+void trc(String msg)
+{
+  Serial1.print(msg);
+}
+
 bool setup_wifi(uint8 n_attempts = 3)
 {
   WiFi.disconnect();
@@ -125,14 +127,14 @@ bool setup_wifi(uint8 n_attempts = 3)
     delay(500);
     if (WiFi.status() == WL_CONNECTED)
     {
-      Serial1.println("");
-      Serial1.print(F("IP address: "));
-      Serial1.println(WiFi.localIP());
+      trc(F("\nIP address: "));
+      trc("" + WiFi.localIP());
+      trc("\n");
       return true;
     }
     else
     {
-      Serial1.print(".");
+      trc(".");
     }
   }
   return false;
@@ -140,7 +142,7 @@ bool setup_wifi(uint8 n_attempts = 3)
 
 bool mqtt_connect(uint8 n_attempts = 3)
 {
-  Serial1.print(F("Attempting MQTT connection..."));
+  trc(F("Attempting MQTT connection..."));
   const String clientId = "VitoWiFi-" + String(ESP.getChipId());
   for (size_t i = 0; i < n_attempts; i++)
   {
@@ -150,12 +152,13 @@ bool mqtt_connect(uint8 n_attempts = 3)
     }
     if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS))
     {
-      Serial1.println(F("connected"));
+      trc(F("connected.\n"));
     }
     else
     {
-      Serial1.print(F("failed, rc="));
-      Serial1.println(client.state());
+      trc(F("failed, rc="));
+      trc("" + client.state());
+      trc("\n");
       delay(1000);
     }
   }
@@ -164,13 +167,14 @@ bool mqtt_connect(uint8 n_attempts = 3)
 
 void globalCallbackHandler(const IDatapoint &dp, DPValue value)
 {
-  Serial1.print(dp.getGroup());
-  Serial1.print(" - ");
-  Serial1.print(dp.getName());
-  Serial1.print(" is ");
+  trc(dp.getGroup());
+  trc(" - ");
+  trc(dp.getName());
+  trc(" is ");
   char value_str[15] = {0};
   value.getString(value_str, sizeof(value_str));
-  Serial1.println(value_str);
+  trc(value_str);
+  trc("\n");
 
   // MQTT
   char topic[50];
@@ -205,26 +209,72 @@ void setup()
       VitoWiFi.setGlobalCallback(globalCallbackHandler);
       VitoWiFi.setup(&Serial);
 
-      Serial1.println(F("Vitotronic reading..."));
+      trc(F("Vitotronic reading...\n"));
       delay(500);
       VitoWiFi.readAll();
 
       // simulate Arduino "loop()" function
       // i.e., must give VitoWiFi a chance to process all datapoint queues
       const unsigned long tstart = millis();
-      const unsigned long duration_sec = 3 * 1000UL;  // 3 seconds
+      const unsigned long duration_sec = 3 * 1000UL; // 3 seconds
       while (millis() - tstart <= duration_sec)
       {
         VitoWiFi.loop();
       }
-    }
-  }
 
-  Serial1.println(F("DeepSleep..."));
+      // OTA
+      {
+        ArduinoOTA.setPassword("sdjsa93274zfdh");
+        ArduinoOTA.onStart([]() {
+          trc(F("OTA start\n"));
+          client.publish("/esp/VitoWiFi/ota", "start");
+        });
+        ArduinoOTA.onEnd([]() {
+          trc(F("OTA end\n"));
+          client.publish("/esp/VitoWiFi/ota", "end");
+        });
+        ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+          Serial1.printf("Progress: %u%%\r", (progress / (total / 100)));
+        });
+        ArduinoOTA.onError([](ota_error_t error) {
+          Serial1.printf("Error[%u]: ", error);
+          if (error == OTA_AUTH_ERROR)
+            trc(F("Auth Failed"));
+          else if (error == OTA_BEGIN_ERROR)
+            trc(F("Begin Failed"));
+          else if (error == OTA_CONNECT_ERROR)
+            trc(F("Connect Failed"));
+          else if (error == OTA_RECEIVE_ERROR)
+            trc(F("Receive Failed"));
+          else if (error == OTA_END_ERROR)
+            trc(F("End Failed"));
+          trc("\n");
+          client.publish("/esp/VitoWiFi/ota", "error:" + error);
+        });
+
+        ArduinoOTA.begin();
+
+        unsigned int timeout_OTA = 200; // 200*100 = 20000 msec = 20 sec
+        while (timeout_OTA > 0)
+        {
+          ArduinoOTA.handle();
+          delay(100);
+          timeout_OTA--;
+        }
+      } // OTA
+
+    } // mqtt
+
+    delay(50);
+    WiFi.disconnect();
+  } // wifi
+
+  delay(50);
+  trc(F("DeepSleep!\n"));
   // micro seconds
   // 1e6 = 1.000.000 = 1 second
   // 6e8 = 10 * 60 * 1e6 = 600 sec = 10 min
-  ESP.deepSleep(6e8);   // 10 * 60 sec = 10 min
+  ESP.deepSleep(6e8); // 10 * 60 sec = 10 min
   //ESP.deepSleep(10 * 1e6); // 10 sec
 }
 
