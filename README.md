@@ -9,23 +9,26 @@ AST, 12.03.2019
 
 Motivation
 ----------
-We have a Vissmann boiler with a Vitotronic 200 KW1 (V200KW1), Witterungsgeführte Kesselregelung für gleitend abgesenkte Kesselwassertemperatur.  
+For a Vissmann boiler with a control interface Vitotronic 200 KW1 (V200KW1):   
 * How much energy is consumed?
 * How to monitor the boiler's temperatures?
 * What is the boiler doing over time?
 * How to interface with the boiler?
 
+(DE) "Witterungsgeführte Kesselregelung für gleitend abgesenkte Kesselwassertemperatur"  
+
 
 Solution Approach
 -----------------
-* Use the optical interface.
+* Use the optical maintenance interface of the Vitotronic control interface.
 	* <https://github.com/openv/openv/wiki/Die-Optolink-Schnittstelle>
 	* KW Protocol, <https://github.com/openv/openv/wiki/Protokoll-KW>
 * Use Arduino ESP8266 with a DIY optocoupler interface, see <https://github.com/openv/openv/wiki/Bauanleitung-ESP8266>
-* Use the great VitoWiFi
+* Use VitoWiFi library
 	* Arduino Library for ESP8266 to communicate with Viessmann boilers using a (DIY) serial optolink.
 	* <https://github.com/bertmelis/VitoWiFi.git>
-	* based on the fantastic OpenV library
+    * Many thanks for this gread library!
+	* Based on the fantastic OpenV library
 
 
 
