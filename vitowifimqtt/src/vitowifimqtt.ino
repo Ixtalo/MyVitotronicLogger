@@ -34,29 +34,30 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 VitoWiFi_setProtocol(KW);
 
-//unsigned long waitPeriod = 60 * 1000UL;
-//unsigned long lastMillis = 0;
 
+
+///------------------------------------------------------------------
+/// Data Points
+///------------------------------------------------------------------
 /// Vitotronik 200 Typ KW1
 /// https://github.com/openv/openv/wiki/Adressen
+/// kd_list_nr2_20110719.pdf, "Datenpunktliste Vitotronic 200-H; 050 (Typ HK1W)_20AA"
 
+// Aussentemperatur Tiefpass [R]
+// Currently calculated low pass outside temperature, Time constant 30 minutes.
 DPTemp outsideTemp("outsideTemp", "temperature", 0x5525); // 2-Byte, -60..60
-
-// Kesseltemperatur
-DPTemp boilerTemp("boilerTemp", "temperature", 0x0810); // 2-Byte, 0..150
-
-// WW-Temperatur (Speicher)
+// Kesseltemperatur Tiefpass [R]
+DPTemp boilerTemp("boilerTemp", "temperature", 0x0810); // 2-Byte, 0..127
+// WW-Temperatur (Speicher) [R]
 DPTemp store1Temp("STS1", "temperature", 0x0812); // 2-Byte, 0..150
-
-DPTemp roomTemp("RTS", "temperature", 0x0896);
-DPTemp agtsTemp("AGTS", "temperature", 0x0816);
-DPTemp rltsTemp("RLTS", "temperature", 0x080A);
-DPTemp vltsTemp("VLTS", "temperature", 0x080C);
-
-// DOES NOT WORK DPTemp store2Temp("store2Temp", "temperature", 0x0813);  // 2-Byte, 0..150
-// (equal to room temp) DPTemp outletTemp("outletTemp", "temperature", 0x0814);  // 2-Byte, 0..150
-// DOES NOT WORK (-0.1) DPTemp setFlowTemp("setFlowTemp", "temperature", 0x2544);
-// DOES NOT WORK (-0.1) DPTemp setBoilerTemp("setBoilerTemp", "temperature", 0x555A);
+// Raumtemperatur A1M1 Tiefpass RTS [R]
+DPTemp roomTemp("RTS", "temperature", 0x0896);   // 2-Byte, 0..127
+// Abgastemperatur Tiefpass AGTS [R]
+DPTemp agtsTemp("AGTS", "temperature", 0x0816);  // 2-Byte
+// Rücklauftemperatur (17A) [R]
+DPTemp rltsTemp("RLTS", "temperature", 0x080A);  // 2-Byte
+// Vorlauftemperatur (17B) [R]
+DPTemp vltsTemp("VLTS", "temperature", 0x080C);  // 2-Byte
 
 /*
 room temp
@@ -69,25 +70,43 @@ reduced room temp
 11	615.5
 12	615.6
 */
-DPTemp setRoomTemp("setRoomTemp", "temperature", 0x2306);
-DPTemp setRoomReducedTemp("setRoomReducedTemp", "temperature", 0x2307);
-// DOES NOT WORK (-0.1) DPTemp setExtRoomTemp("setExtRoomTemp", "temperature", 0x2321);
 
-/**
- * TODO
- * SOLL Reduz. Raumtemperatur
- * SOLL WW-Temperatur
- **/
-
+// Raumtemperatur Soll
+DPTemp setRoomTemp("setRoomTemp", "temperature", 0x2306); // 1-Byte, 3..37
+// Reduizierte Raumtemperatur Soll [RW]
+DPTemp setRoomReducedTemp("setRoomReducedTemp", "temperature", 0x2307); // 1-Byte, 3..37
+// Betriebsstunden Stufe 1
 DPHours boilerRunHours("runHours", "burner", 0x08A7); // 4-Byte, 0..1150000
+// Brennerstarts [R]
 DPCount boilerRuns("starts", "burner", 0x088A);       // 4-Byte, 0..1150000
-
+// aktuelle Betriebsart A1M1 [R]; 0=Standby mode, 1=Reduced mode, 2=Standard mode, 3=Standard mode
 DPMode currentOperatingMode("currentOperatingMode", "operation", 0x2500); // 1-Byte, 0..3
+// Heizkreispumpe A1M1 [R]
+DPStat aim1Pump("a1m1Pump", "pump", 0x2906);
+// Speicherladepumpe [R]
+DPStat storePump("storePump", "pump", 0x0845);
+// Zirkulationspumpe [R]
+DPStat circuitPump("circuitPump", "pump", 0x0846);
+
+// DOES NOT WORK DPTemp store2Temp("store2Temp", "temperature", 0x0813);  // 2-Byte, 0..150
+// (equal to room temp) DPTemp outletTemp("outletTemp", "temperature", 0x0814);  // 2-Byte, 0..150
+// DOES NOT WORK (-0.1) DPTemp setFlowTemp("setFlowTemp", "temperature", 0x2544);
+// DOES NOT WORK (-0.1) DPTemp setBoilerTemp("setBoilerTemp", "temperature", 0x555A); // 2-Byte
+// DOES NOT WORK (-0.1) DPTemp setExtRoomTemp("setExtRoomTemp", "temperature", 0x2321);
 // DOES NOT WORK (255) DPMode operatingMode("operatingMode", "operation", 0x2323); // 1-Byte, 0..3
 
-DPStat aim1Pump("a1m1Pump", "pump", 0x2906);
-DPStat storePump("storePump", "pump", 0x0845);
-DPStat circuitPump("circuitPump", "pump", 0x0846);
+/*
+TODO
+
+0x55E3 1-byte aktuelle Leistung %
+0x5555 1-byte Drosselklappenposition (0..100%)
+0x0800 2-byte ATS Aussentemperatur (Sensor 1)
+0x0802 2-byte KTS Kesseltemperatur (Sensor 3)
+0x0804 2-byte STS1 Speichertemperatur (Sensor 5)
+AGTS Abgastemperatur (Sensor 15)
+
+*/
+
 
 /*
 Example output:
@@ -109,6 +128,13 @@ pump - circuitPump is false
 
 */
 
+
+///------------------------------------------------------------------
+///------------------------------------------------------------------
+///------------------------------------------------------------------
+
+
+
 void trc(String msg)
 {
   Serial1.print(msg);
@@ -128,7 +154,7 @@ bool setup_wifi(uint8 n_attempts = 3)
     if (WiFi.status() == WL_CONNECTED)
     {
       trc(F("\nIP address: "));
-      trc("" + WiFi.localIP());
+      trc(WiFi.localIP().toString());
       trc("\n");
       return true;
     }
@@ -208,6 +234,8 @@ void setup()
       // must be set after adding at least 1 datapoint
       VitoWiFi.setGlobalCallback(globalCallbackHandler);
       VitoWiFi.setup(&Serial);
+      VitoWiFi.setLogger(&Serial1);
+      VitoWiFi.enableLogger();
 
       trc(F("Vitotronic reading...\n"));
       delay(500);
@@ -216,7 +244,7 @@ void setup()
       // simulate Arduino "loop()" function
       // i.e., must give VitoWiFi a chance to process all datapoint queues
       const unsigned long tstart = millis();
-      const unsigned long duration_sec = 3 * 1000UL; // 3 seconds
+      const unsigned long duration_sec = 5 * 1000UL;
       while (millis() - tstart <= duration_sec)
       {
         VitoWiFi.loop();
