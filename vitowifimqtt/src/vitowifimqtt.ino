@@ -1,40 +1,89 @@
 /*
  * MyVitotronicLogger
  * Vissmann boiler logger with DIY OptoLink interface.  
- * AST, 12.03.2019
- * Last update: 26.12.2019 (MQTT authentication)
+ * AST, 03/2019
  * 
  * Based on https://github.com/bertmelis/VitoWiFi.git
  * 
  */
+#include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+#include <ESP8266mDNS.h>
 #include <PubSubClient.h> // MQTT, https://pubsubclient.knolleary.net/
 #include <VitoWiFi.h>     // https://github.com/bertmelis/VitoWiFi.git
-#include <ArduinoOTA.h>
+
+
+// debug mode activation switch
+// it is set in setup() and can be set via hardware 
+// by wiring DEBUG_PIN to ground
+#define DEBUG_PIN D1
+bool debug = false;
 
 // declare WIFI_SSID in external header file
 // const char* WIFI_SSID = "...";
 // const char* WIFI_PASS = "...";
-#include "/home/stc/Work/SmartHomeWorkspace/WifiCredentials.h"
+#include "WifiCredentials.h"
 
 // MQTT
 // const char* MQTT_HOST = "192.168.3.1";
 // const unsigned int MQTT_PORT = 1883;
 // const char* MQTT_USER = "...";
 // const char* MQTT_PASS = "...";
-#include "/home/stc/Work/SmartHomeWorkspace/SensorNodeMqttSettings.h"
+#include "SensorNodeMqttSettings.h"
 
 // WiFi static IP configuration (instead of DHCP)
-IPAddress staticIP(192, 168, 3, 8);
-IPAddress gateway(192, 168, 3, 1);
-IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(gateway);
+const IPAddress staticIP(192, 168, 3, 8);
+const IPAddress gateway(192, 168, 3, 1);
+const IPAddress subnet(255, 255, 255, 0);
+const IPAddress dns(gateway);
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+
+// OTA update settings
+#define OTA_URL "http://musca.local:8266/firmware.bin"
+#define OTA_VERSION ""
+
+// OTA signing
+const char pubkey[] PROGMEM = R"EOF(
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw41BEMOgGz2AktKMETlH
+nVLDDxGr/CxRJWL4FEqJz5k2zLDWQdUQGUGsD0lYNS5mV3kz+W83U4Qh3VpHRlnn
+J0/4yXOLo46KR3+MqlHXbiyOMBZdi0/i+OP8octQDGLb880hNhHt6Ix0CtdHKsaQ
+ju6gIcKcz2VXbDV4AZ0qRqrj85vAx+Vl5j/dHOzQKJy43XHZD/RuEkjjjqsXIZe6
+NdVKMGjNMYzRF1y7NME6PHQicIuFjd9pwdrlGWgYwdKIC5OVKrHrEG/DnQ0gH7lw
+fLqKojGgTEJSBtZKEjcAM6VhnGJ5ra2KwcRnyOFbpHQBTRwPzSuLdxywWCyJ8Xmy
+TQIDAQAB
+-----END PUBLIC KEY-----
+)EOF";
+BearSSL::PublicKey signPubKey(pubkey);
+BearSSL::HashSHA256 hash;
+BearSSL::SigningVerifier sign( &signPubKey );
+
+void ota_update_started()
+{
+  Serial1.println("[OTA]  HTTP update process started");
+}
+
+void ota_update_finished()
+{
+  Serial1.println("[OTA]  HTTP update process finished");
+}
+
+void ota_update_progress(int cur, int total)
+{
+  Serial1.printf("\r[OTA]  HTTP update process at %d of %d bytes...", cur, total);
+}
+
+void ota_update_error(int err)
+{
+  Serial1.printf("[OTA]  HTTP update fatal error code %d\n", err);
+}
+
+
+WiFiClient wifiClient;
+PubSubClient client(wifiClient);
 VitoWiFi_setProtocol(KW);
-
-
 
 ///------------------------------------------------------------------
 /// Data Points
@@ -51,13 +100,13 @@ DPTemp boilerTemp("boilerTemp", "temperature", 0x0810); // 2-Byte, 0..127
 // WW-Temperatur (Speicher) [R]
 DPTemp store1Temp("STS1", "temperature", 0x0812); // 2-Byte, 0..150
 // Raumtemperatur A1M1 Tiefpass RTS [R]
-DPTemp roomTemp("RTS", "temperature", 0x0896);   // 2-Byte, 0..127
+DPTemp roomTemp("RTS", "temperature", 0x0896); // 2-Byte, 0..127
 // Abgastemperatur Tiefpass AGTS [R]
-DPTemp agtsTemp("AGTS", "temperature", 0x0816);  // 2-Byte
+DPTemp agtsTemp("AGTS", "temperature", 0x0816); // 2-Byte
 // Rücklauftemperatur (17A) [R]
-DPTemp rltsTemp("RLTS", "temperature", 0x080A);  // 2-Byte
+DPTemp rltsTemp("RLTS", "temperature", 0x080A); // 2-Byte
 // Vorlauftemperatur (17B) [R]
-DPTemp vltsTemp("VLTS", "temperature", 0x080C);  // 2-Byte
+DPTemp vltsTemp("VLTS", "temperature", 0x080C); // 2-Byte
 
 /*
 room temp
@@ -78,7 +127,7 @@ DPTemp setRoomReducedTemp("setRoomReducedTemp", "temperature", 0x2307); // 1-Byt
 // Betriebsstunden Stufe 1
 DPHours boilerRunHours("runHours", "burner", 0x08A7); // 4-Byte, 0..1150000
 // Brennerstarts [R]
-DPCount boilerRuns("starts", "burner", 0x088A);       // 4-Byte, 0..1150000
+DPCount boilerRuns("starts", "burner", 0x088A); // 4-Byte, 0..1150000
 // aktuelle Betriebsart A1M1 [R]; 0=Standby mode, 1=Reduced mode, 2=Standard mode, 3=Standard mode
 DPMode currentOperatingMode("currentOperatingMode", "operation", 0x2500); // 1-Byte, 0..3
 // Heizkreispumpe A1M1 [R]
@@ -107,7 +156,6 @@ AGTS Abgastemperatur (Sensor 15)
 
 */
 
-
 /*
 Example output:
 
@@ -128,16 +176,16 @@ pump - circuitPump is false
 
 */
 
-
 ///------------------------------------------------------------------
 ///------------------------------------------------------------------
 ///------------------------------------------------------------------
-
-
 
 void trc(String msg)
 {
-  Serial1.print(msg);
+  if (debug)
+  {
+    Serial1.print(msg);
+  }
 }
 
 bool setup_wifi(uint8 n_attempts = 3)
@@ -210,14 +258,36 @@ void globalCallbackHandler(const IDatapoint &dp, DPValue value)
 
 void setup()
 {
-  // initial grace wait time
-  delay(2 * 1000);
+  // Use a DEBUG_PIN as hardware-defined debug on/off switch.
+  // To enable serial output, connect GND and DEBUG_PIN (e.g. D1).
+  // At startup, pins are configured as INPUT.
+  // https://arduino-esp8266.readthedocs.io/en/latest/reference.html#digital-io
+  pinMode(DEBUG_PIN, INPUT_PULLUP);
+  debug = 1 - digitalRead(DEBUG_PIN);
 
-  // initialize Serial1 (Serial*ONE*) for logging/status output
-  // (not Serial/Serial0 because it is used for communication with boiler!)
-  // Serial1 uses UART1 which is a transmit-only UART.
-  // UART1 TX pin is D4 (GPIO2, LED!!).
-  Serial1.begin(115200);
+  if (debug) {
+    // Initialize Serial1 (Serial*ONE*) for logging/status output.
+    // (not Serial/Serial0 because it is used for communication with boiler!)
+    // Serial1 uses UART1 which is a transmit-only UART.
+    // UART1 TX pin is D4 (GPIO2, LED!!).
+    // UART1 can not be used to receive data because normally it’s RX pin is occupied for flash chip connection.
+    // https://arduino-esp8266.readthedocs.io/en/latest/reference.html#serial
+    Serial1.begin(115200);
+
+    // enable diagnostic output from WiFi libraries
+    Serial1.setDebugOutput(true);
+
+    delay(1000);
+    Serial1.printf("DEBUG: %d\n", debug);
+    Serial1.printf("Reset reason: %s\n", ESP.getResetReason().c_str());
+    Serial1.printf("Reset info: %s\n", ESP.getResetInfo().c_str());
+    Serial1.flush();
+  }
+
+  if (debug)
+  {
+    
+  }
 
   // WiFi setup/connection
   if (setup_wifi(10))
@@ -234,8 +304,11 @@ void setup()
       // must be set after adding at least 1 datapoint
       VitoWiFi.setGlobalCallback(globalCallbackHandler);
       VitoWiFi.setup(&Serial);
-      VitoWiFi.setLogger(&Serial1);
-      VitoWiFi.enableLogger();
+      if (debug)
+      {
+        VitoWiFi.setLogger(&Serial1);
+        VitoWiFi.enableLogger();
+      }
 
       trc(F("Vitotronic reading...\n"));
       delay(500);
@@ -252,43 +325,33 @@ void setup()
 
       // OTA
       {
-        ArduinoOTA.setPassword("sdjsa93274zfdh");
-        ArduinoOTA.onStart([]() {
-          trc(F("OTA start\n"));
-          client.publish("/esp/VitoWiFi/ota", "start");
-        });
-        ArduinoOTA.onEnd([]() {
-          trc(F("OTA end\n"));
-          client.publish("/esp/VitoWiFi/ota", "end");
-        });
-        ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-          Serial1.printf("Progress: %u%%\r", (progress / (total / 100)));
-        });
-        ArduinoOTA.onError([](ota_error_t error) {
-          Serial1.printf("Error[%u]: ", error);
-          if (error == OTA_AUTH_ERROR)
-            trc(F("Auth Failed"));
-          else if (error == OTA_BEGIN_ERROR)
-            trc(F("Begin Failed"));
-          else if (error == OTA_CONNECT_ERROR)
-            trc(F("Connect Failed"));
-          else if (error == OTA_RECEIVE_ERROR)
-            trc(F("Receive Failed"));
-          else if (error == OTA_END_ERROR)
-            trc(F("End Failed"));
-          trc("\n");
-          client.publish("/esp/VitoWiFi/ota", "error:" + error);
-        });
-
-        ArduinoOTA.begin();
-
-        unsigned int timeout_OTA = 200; // 200*100 = 20000 msec = 20 sec
-        while (timeout_OTA > 0)
+        Update.installSignature(&hash, &sign);
+        ESPhttpUpdate.rebootOnUpdate(true);
+        ESPhttpUpdate.onStart(ota_update_started);
+        ESPhttpUpdate.onEnd(ota_update_finished);
+        ESPhttpUpdate.onProgress(ota_update_progress);
+        ESPhttpUpdate.onError(ota_update_error);
+        WiFiClient client;
+        const char *hostname = "ESP-" + ESP.getChipId();
+        MDNS.setHostname(hostname);
+        MDNS.begin(hostname);
+        t_httpUpdate_return ret = ESPhttpUpdate.update(client, OTA_URL, OTA_VERSION);
+        switch (ret)
         {
-          ArduinoOTA.handle();
-          delay(100);
-          timeout_OTA--;
+        case HTTP_UPDATE_FAILED:
+          Serial1.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+          break;
+
+        case HTTP_UPDATE_NO_UPDATES:
+          Serial1.println("HTTP_UPDATE_NO_UPDATES");
+          break;
+
+        case HTTP_UPDATE_OK:
+          Serial1.println("HTTP_UPDATE_OK");
+          break;
         }
+        Serial1.flush();
+        delay(1000);
       } // OTA
 
     } // mqtt
