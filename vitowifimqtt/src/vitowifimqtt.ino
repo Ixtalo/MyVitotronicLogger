@@ -343,8 +343,8 @@ void setup()
 
   delay(50);
   trc(F("DeepSleep!\n"));
-  // 1e6 = 1.000.000 micro senconds = 1 second
-  // 6e8 = 10 * 60 * 1e6 = 600 sec = 10 min
+  // 1e6 = 1.000.000 msec = 1 second
+  // 6e8 = 10 * 60 * 1e6 msec = 600 sec = 10 min
   ESP.deepSleep(6e8);
 }
 
