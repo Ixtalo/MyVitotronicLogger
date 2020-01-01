@@ -188,32 +188,6 @@ void trc(String msg)
   }
 }
 
-bool setup_wifi(uint8 n_attempts = 3)
-{
-  WiFi.disconnect();
-  delay(10);
-  WiFi.mode(WIFI_STA);
-  WiFi.hostname("ESP-VitoWiFi");
-  WiFi.config(staticIP, subnet, gateway, dns);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  for (size_t i = 0; i < n_attempts; i++)
-  {
-    delay(500);
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      trc(F("\nIP address: "));
-      trc(WiFi.localIP().toString());
-      trc("\n");
-      return true;
-    }
-    else
-    {
-      trc(".");
-    }
-  }
-  return false;
-}
-
 bool mqtt_connect(uint8 n_attempts = 3)
 {
   trc(F("Attempting MQTT connection..."));
@@ -274,25 +248,30 @@ void setup()
     // https://arduino-esp8266.readthedocs.io/en/latest/reference.html#serial
     Serial1.begin(115200);
 
-    // enable diagnostic output from WiFi libraries
-    Serial1.setDebugOutput(true);
+    // diagnostic output from WiFi libraries
+    //Serial1.setDebugOutput(true);
 
     delay(1000);
     Serial1.printf("DEBUG: %d\n", debug);
+    Serial1.printf("%s\n", ESP.getFullVersion().c_str());
+    // https://arduino-esp8266.readthedocs.io/en/latest/boards.html#boot-messages-and-modes
+    Serial1.printf("Boot mode: %d\n", ESP.getBootMode());
     Serial1.printf("Reset reason: %s\n", ESP.getResetReason().c_str());
-    Serial1.printf("Reset info: %s\n", ESP.getResetInfo().c_str());
+    //////Serial.printf("Reset info: %s\n", ESP.getResetInfo().c_str());
     Serial1.flush();
   }
 
-  if (debug)
-  {
-    
-  }
 
-  // WiFi setup/connection
-  if (setup_wifi(10))
-  {
+  // start WiFi connection
+  // (automatic reconnection tries is done by ESP8266WiFi)
+  WiFi.mode(WIFI_STA);
+  WiFi.hostname("ESP-VitoWiFi");
+  WiFi.begin(WIFI_SSID, WIFI_SSID);
+  int8_t wifi_res = WiFi.waitForConnectResult(3e6); // timeout 3e6 = 3 seconds
+  if (debug) Serial1.printf("WiFi wifi_res: %d\n", wifi_res);
 
+  if (WiFi.status() == WL_CONNECTED)
+  {
     // MQTT setup/connection
     client.setServer(MQTT_HOST, MQTT_PORT);
     if (mqtt_connect(3))
@@ -315,11 +294,13 @@ void setup()
       VitoWiFi.readAll();
 
       // simulate Arduino "loop()" function
-      // i.e., must give VitoWiFi a chance to process all datapoint queues
+      // i.e., must give VitoWiFi a chance to process all datapoints
       const unsigned long tstart = millis();
       const unsigned long duration_sec = 5 * 1000UL;
       while (millis() - tstart <= duration_sec)
       {
+        // this processes all datapoints, the previously definde callback
+        // is being called for each defined datapoint
         VitoWiFi.loop();
       }
 
@@ -362,11 +343,9 @@ void setup()
 
   delay(50);
   trc(F("DeepSleep!\n"));
-  // micro seconds
-  // 1e6 = 1.000.000 = 1 second
+  // 1e6 = 1.000.000 micro senconds = 1 second
   // 6e8 = 10 * 60 * 1e6 = 600 sec = 10 min
-  ESP.deepSleep(6e8); // 10 * 60 sec = 10 min
-  //ESP.deepSleep(10 * 1e6); // 10 sec
+  ESP.deepSleep(6e8);
 }
 
 void loop()
