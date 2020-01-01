@@ -1,7 +1,7 @@
 /*
  * MyVitotronicLogger
  * Vissmann boiler logger with DIY OptoLink interface.  
- * AST, 03/2019
+ * AST, 03/2019 (initial version)
  * 
  * Based on https://github.com/bertmelis/VitoWiFi.git
  * 
@@ -15,11 +15,14 @@
 #include <VitoWiFi.h>     // https://github.com/bertmelis/VitoWiFi.git
 
 
+// hostname/clientId
+const char* deviceName = "ESP-VitoWiFi";
+
 // debug mode activation switch
 // it is set in setup() and can be set via hardware 
 // by wiring DEBUG_PIN to ground
 #define DEBUG_PIN D1
-bool debug = false;
+bool debug = false;   // possible changed in setup()
 
 // declare WIFI_SSID in external header file
 // const char* WIFI_SSID = "...";
@@ -33,11 +36,11 @@ bool debug = false;
 // const char* MQTT_PASS = "...";
 #include "SensorNodeMqttSettings.h"
 
-// WiFi static IP configuration (instead of DHCP)
-const IPAddress staticIP(192, 168, 3, 8);
-const IPAddress gateway(192, 168, 3, 1);
-const IPAddress subnet(255, 255, 255, 0);
-const IPAddress dns(gateway);
+//// WiFi static IP configuration (instead of DHCP)
+//const IPAddress staticIP(192, 168, 3, 8);
+//const IPAddress gateway(192, 168, 3, 1);
+//const IPAddress subnet(255, 255, 255, 0);
+//const IPAddress dns(gateway);
 
 
 // OTA update settings
@@ -95,6 +98,8 @@ VitoWiFi_setProtocol(KW);
 // Aussentemperatur Tiefpass [R]
 // Currently calculated low pass outside temperature, Time constant 30 minutes.
 DPTemp outsideTemp("outsideTemp", "temperature", 0x5525); // 2-Byte, -60..60
+// 0x0800 2-byte ATS Aussentemperatur (Sensor 1)
+DPTemp atsTemp("ATS", "temperature", 0x0800);
 // Kesseltemperatur Tiefpass [R]
 DPTemp boilerTemp("boilerTemp", "temperature", 0x0810); // 2-Byte, 0..127
 // WW-Temperatur (Speicher) [R]
@@ -107,6 +112,24 @@ DPTemp agtsTemp("AGTS", "temperature", 0x0816); // 2-Byte
 DPTemp rltsTemp("RLTS", "temperature", 0x080A); // 2-Byte
 // Vorlauftemperatur (17B) [R]
 DPTemp vltsTemp("VLTS", "temperature", 0x080C); // 2-Byte
+// 0x0802 2-byte KTS Kesseltemperatur (Sensor 3)
+DPTemp ktsTemp("KTS", "temperature", 0x0802);
+// Betriebsstunden Stufe 1
+DPHours boilerRunHours("runHours", "burner", 0x08A7); // 4-Byte, 0..1150000
+// Brennerstarts [R]
+DPCount boilerRuns("starts", "burner", 0x088A); // 4-Byte, 0..1150000
+// aktuelle Betriebsart A1M1 [R]; 0=Standby mode, 1=Reduced mode, 2=Standard mode, 3=Standard mode
+DPMode currentOperatingMode("currentOperatingMode", "operation", 0x2500); // 1-Byte, 0..3
+// 0x55E3 1-byte aktuelle Leistung %
+DPMode currentPower("currentPower", "operation", 0x55E3);
+// 0x5555 1-byte Drosselklappenposition (0..100%)
+DPMode throttlePosition("throttlePosition", "operation", 0x5555);
+// Heizkreispumpe A1M1 [R]
+DPStat aim1Pump("a1m1Pump", "pump", 0x2906);
+// Speicherladepumpe [R]
+DPStat storePump("storePump", "pump", 0x0845);
+// Zirkulationspumpe [R]
+DPStat circuitPump("circuitPump", "pump", 0x0846);
 
 /*
 room temp
@@ -119,23 +142,12 @@ reduced room temp
 11	615.5
 12	615.6
 */
-
 // Raumtemperatur Soll
 DPTemp setRoomTemp("setRoomTemp", "temperature", 0x2306); // 1-Byte, 3..37
 // Reduizierte Raumtemperatur Soll [RW]
 DPTemp setRoomReducedTemp("setRoomReducedTemp", "temperature", 0x2307); // 1-Byte, 3..37
-// Betriebsstunden Stufe 1
-DPHours boilerRunHours("runHours", "burner", 0x08A7); // 4-Byte, 0..1150000
-// Brennerstarts [R]
-DPCount boilerRuns("starts", "burner", 0x088A); // 4-Byte, 0..1150000
-// aktuelle Betriebsart A1M1 [R]; 0=Standby mode, 1=Reduced mode, 2=Standard mode, 3=Standard mode
-DPMode currentOperatingMode("currentOperatingMode", "operation", 0x2500); // 1-Byte, 0..3
-// Heizkreispumpe A1M1 [R]
-DPStat aim1Pump("a1m1Pump", "pump", 0x2906);
-// Speicherladepumpe [R]
-DPStat storePump("storePump", "pump", 0x0845);
-// Zirkulationspumpe [R]
-DPStat circuitPump("circuitPump", "pump", 0x0846);
+
+
 
 // DOES NOT WORK DPTemp store2Temp("store2Temp", "temperature", 0x0813);  // 2-Byte, 0..150
 // (equal to room temp) DPTemp outletTemp("outletTemp", "temperature", 0x0814);  // 2-Byte, 0..150
@@ -144,17 +156,6 @@ DPStat circuitPump("circuitPump", "pump", 0x0846);
 // DOES NOT WORK (-0.1) DPTemp setExtRoomTemp("setExtRoomTemp", "temperature", 0x2321);
 // DOES NOT WORK (255) DPMode operatingMode("operatingMode", "operation", 0x2323); // 1-Byte, 0..3
 
-/*
-TODO
-
-0x55E3 1-byte aktuelle Leistung %
-0x5555 1-byte Drosselklappenposition (0..100%)
-0x0800 2-byte ATS Aussentemperatur (Sensor 1)
-0x0802 2-byte KTS Kesseltemperatur (Sensor 3)
-0x0804 2-byte STS1 Speichertemperatur (Sensor 5)
-AGTS Abgastemperatur (Sensor 15)
-
-*/
 
 /*
 Example output:
@@ -188,17 +189,16 @@ void trc(String msg)
   }
 }
 
-bool mqtt_connect(uint8 n_attempts = 3)
+bool mqtt_connect(const char* clientId, const uint8 n_attempts = 3)
 {
   trc(F("Attempting MQTT connection..."));
-  const String clientId = "VitoWiFi-" + String(ESP.getChipId());
   for (size_t i = 0; i < n_attempts; i++)
   {
     if (client.connected())
     {
       return true;
     }
-    if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS))
+    if (client.connect(clientId, MQTT_USER, MQTT_PASS))
     {
       trc(F("connected.\n"));
     }
@@ -226,7 +226,7 @@ void globalCallbackHandler(const IDatapoint &dp, DPValue value)
 
   // MQTT
   char topic[50];
-  snprintf(topic, 50, "/esp/VitoWiFi/%s", dp.getName());
+  snprintf(topic, 50, "tele/VitoWiFi/%s", dp.getName());
   client.publish(topic, value_str);
 }
 
@@ -249,7 +249,11 @@ void setup()
     Serial1.begin(115200);
 
     // diagnostic output from WiFi libraries
-    //Serial1.setDebugOutput(true);
+    Serial1.setDebugOutput(true);
+
+    ////// VitoWiFi diagnostic messages
+    ////VitoWiFi.setLogger(Serial1);
+    ////VitoWiFi.enableLogger();
 
     delay(1000);
     Serial1.printf("DEBUG: %d\n", debug);
@@ -257,7 +261,6 @@ void setup()
     // https://arduino-esp8266.readthedocs.io/en/latest/boards.html#boot-messages-and-modes
     Serial1.printf("Boot mode: %d\n", ESP.getBootMode());
     Serial1.printf("Reset reason: %s\n", ESP.getResetReason().c_str());
-    //////Serial.printf("Reset info: %s\n", ESP.getResetInfo().c_str());
     Serial1.flush();
   }
 
@@ -265,18 +268,18 @@ void setup()
   // start WiFi connection
   // (automatic reconnection tries is done by ESP8266WiFi)
   WiFi.mode(WIFI_STA);
-  WiFi.hostname("ESP-VitoWiFi");
+  WiFi.hostname(deviceName);
   WiFi.begin(WIFI_SSID, WIFI_SSID);
-  int8_t wifi_res = WiFi.waitForConnectResult(3e6); // timeout 3e6 = 3 seconds
-  if (debug) Serial1.printf("WiFi wifi_res: %d\n", wifi_res);
+  const int8_t wifi_res = WiFi.waitForConnectResult(3e6); // timeout 3e6 = 3 seconds
+  Serial1.printf("WiFi wifi_res: %d\n", wifi_res);
 
   if (WiFi.status() == WL_CONNECTED)
   {
     // MQTT setup/connection
     client.setServer(MQTT_HOST, MQTT_PORT);
-    if (mqtt_connect(3))
+    if (mqtt_connect(deviceName, 3))
     {
-      client.publish("/esp/VitoWiFi/ip", WiFi.localIP().toString().c_str());
+      client.publish("tele/VitoWiFi/ip", WiFi.localIP().toString().c_str());
 
       // VitoWiFi setup
       // this callback will be used for all DPs without specific callback
@@ -296,7 +299,7 @@ void setup()
       // simulate Arduino "loop()" function
       // i.e., must give VitoWiFi a chance to process all datapoints
       const unsigned long tstart = millis();
-      const unsigned long duration_sec = 5 * 1000UL;
+      const unsigned long duration_sec = 6 * 1000UL;
       while (millis() - tstart <= duration_sec)
       {
         // this processes all datapoints, the previously definde callback
@@ -313,9 +316,8 @@ void setup()
         ESPhttpUpdate.onProgress(ota_update_progress);
         ESPhttpUpdate.onError(ota_update_error);
         WiFiClient client;
-        const char *hostname = "ESP-" + ESP.getChipId();
-        MDNS.setHostname(hostname);
-        MDNS.begin(hostname);
+        MDNS.setHostname(deviceName);
+        MDNS.begin(deviceName);
         t_httpUpdate_return ret = ESPhttpUpdate.update(client, OTA_URL, OTA_VERSION);
         switch (ret)
         {
