@@ -302,7 +302,7 @@ void setup()
       const unsigned long tstart = millis();
       const unsigned long max_duration_sec = 10 * 1000UL;
       //while ()
-      while( (iDpProcessed <= numDp) || (millis() - tstart <= max_duration_sec) )
+      while( (iDpProcessed < numDp) || (millis() - tstart <= max_duration_sec) )
       {
         // this processes all datapoints, the previously definde callback
         // is being called for each defined datapoint
