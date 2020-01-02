@@ -100,6 +100,12 @@ VitoWiFi_setProtocol(KW);
 /// https://github.com/openv/openv/wiki/Adressen
 /// kd_list_nr2_20110719.pdf, "Datenpunktliste Vitotronic 200-H; 050 (Typ HK1W)_20AA"
 
+
+// number of datapoints (must be identical to the defined variables)
+const uint8_t numDp = 17;
+// number of processed datapoints (will be set later while running)
+uint8_t iDpProcessed = 0;
+
 // Aussentemperatur Tiefpass [R]
 // Currently calculated low pass outside temperature, Time constant 30 minutes.
 DPTemp outsideTemp("outsideTemp", "temperature", 0x5525); // 2-Byte, -60..60
@@ -125,10 +131,6 @@ DPHours boilerRunHours("runHours", "burner", 0x08A7); // 4-Byte, 0..1150000
 DPCount boilerRuns("starts", "burner", 0x088A); // 4-Byte, 0..1150000
 // aktuelle Betriebsart A1M1 [R]; 0=Standby mode, 1=Reduced mode, 2=Standard mode, 3=Standard mode
 DPMode currentOperatingMode("currentOperatingMode", "operation", 0x2500); // 1-Byte, 0..3
-// 0x55E3 1-byte aktuelle Leistung %
-DPMode currentPower("currentPower", "operation", 0x55E3);
-// 0x5555 1-byte Drosselklappenposition (0..100%)
-DPMode throttlePosition("throttlePosition", "operation", 0x5555);
 // Heizkreispumpe A1M1 [R]
 DPStat aim1Pump("a1m1Pump", "pump", 0x2906);
 // Speicherladepumpe [R]
@@ -153,6 +155,10 @@ DPTemp setRoomTemp("setRoomTemp", "temperature", 0x2306); // 1-Byte, 3..37
 DPTemp setRoomReducedTemp("setRoomReducedTemp", "temperature", 0x2307); // 1-Byte, 3..37
 
 
+// 0x55E3 1-byte aktuelle Leistung %
+// DOES NOT SEEM TO WORK, ALWAYS 255// DPMode currentPower("currentPower", "operation", 0x55E3);
+// 0x5555 1-byte Drosselklappenposition (0..100%)
+// DOES NOT SEEM TO WORK, ALWAYS 255// DPMode throttlePosition("throttlePosition", "operation", 0x5555);
 
 // DOES NOT WORK DPTemp store2Temp("store2Temp", "temperature", 0x0813);  // 2-Byte, 0..150
 // (equal to room temp) DPTemp outletTemp("outletTemp", "temperature", 0x0814);  // 2-Byte, 0..150
@@ -211,6 +217,7 @@ bool mqtt_connect(const char* clientId, const uint8 n_attempts = 3)
 
 void globalCallbackHandler(const IDatapoint &dp, DPValue value)
 {
+  // get value as char
   char value_str[15] = {0};
   value.getString(value_str, sizeof(value_str));
   SER.printf("%s - %s is %s\n", dp.getGroup(), dp.getName(), value_str);
@@ -219,6 +226,9 @@ void globalCallbackHandler(const IDatapoint &dp, DPValue value)
   char topic[50];
   snprintf(topic, 50, "tele/VitoWiFi/%s", dp.getName());
   client.publish(topic, value_str);
+
+  // increment processing counter
+  iDpProcessed++;
 }
 
 void setup()
@@ -274,6 +284,8 @@ void setup()
       // this callback will be used for all DPs without specific callback
       // must be set after adding at least 1 datapoint
       VitoWiFi.setGlobalCallback(globalCallbackHandler);
+      // use the main serial port
+      // (debug output must go to Serial1)
       VitoWiFi.setup(&Serial);
       if (debug)
       {
@@ -288,45 +300,53 @@ void setup()
       // simulate Arduino "loop()" function
       // i.e., must give VitoWiFi a chance to process all datapoints
       const unsigned long tstart = millis();
-      const unsigned long duration_sec = 6 * 1000UL;
-      while (millis() - tstart <= duration_sec)
+      const unsigned long max_duration_sec = 10 * 1000UL;
+      //while ()
+      while( (iDpProcessed <= numDp) || (millis() - tstart <= max_duration_sec) )
       {
         // this processes all datapoints, the previously definde callback
         // is being called for each defined datapoint
         VitoWiFi.loop();
       }
 
-      // OTA
-      {
-        Update.installSignature(&hash, &sign);
-        ESPhttpUpdate.rebootOnUpdate(true);
-        ESPhttpUpdate.onStart(ota_update_started);
-        ESPhttpUpdate.onEnd(ota_update_finished);
-        ESPhttpUpdate.onProgress(ota_update_progress);
-        ESPhttpUpdate.onError(ota_update_error);
-        WiFiClient client;
-        MDNS.setHostname(deviceName);
-        MDNS.begin(deviceName);
-        t_httpUpdate_return ret = ESPhttpUpdate.update(client, OTA_URL, OTA_VERSION);
-        switch (ret)
-        {
-        case HTTP_UPDATE_FAILED:
-          SER.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-          break;
+      // reset the counter
+      iDpProcessed = 0;
 
-        case HTTP_UPDATE_NO_UPDATES:
-          SER.println("HTTP_UPDATE_NO_UPDATES");
-          break;
-
-        case HTTP_UPDATE_OK:
-          SER.println("HTTP_UPDATE_OK");
-          break;
-        }
-        SER.flush();
-        delay(1000);
-      } // OTA
-
+      // MQTT disconnect
+      client.disconnect();
     } // mqtt
+
+
+    // OTA
+    {
+      Update.installSignature(&hash, &sign);
+      ESPhttpUpdate.rebootOnUpdate(true);
+      ESPhttpUpdate.onStart(ota_update_started);
+      ESPhttpUpdate.onEnd(ota_update_finished);
+      ESPhttpUpdate.onProgress(ota_update_progress);
+      ESPhttpUpdate.onError(ota_update_error);
+      WiFiClient client;
+      MDNS.setHostname(deviceName);
+      MDNS.begin(deviceName);
+      t_httpUpdate_return ret = ESPhttpUpdate.update(client, OTA_URL, OTA_VERSION);
+      switch (ret)
+      {
+      case HTTP_UPDATE_FAILED:
+        SER.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+        break;
+
+      case HTTP_UPDATE_NO_UPDATES:
+        SER.println("HTTP_UPDATE_NO_UPDATES");
+        break;
+
+      case HTTP_UPDATE_OK:
+        SER.println("HTTP_UPDATE_OK");
+        break;
+      }
+      SER.flush();
+      delay(1000);
+    } // OTA
+
 
     delay(50);
     WiFi.disconnect();
