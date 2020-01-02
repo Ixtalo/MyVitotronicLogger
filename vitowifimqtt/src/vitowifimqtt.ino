@@ -247,7 +247,6 @@ void setup()
     ////VitoWiFi.enableLogger();
 
     delay(1000);
-    SER.printf("DEBUG: %d\n", debug);
     SER.printf("%s\n", ESP.getFullVersion().c_str());
     // https://arduino-esp8266.readthedocs.io/en/latest/boards.html#boot-messages-and-modes
     SER.printf("Boot mode: %d\n", ESP.getBootMode());
@@ -259,7 +258,7 @@ void setup()
   // (automatic reconnection tries is done by ESP8266WiFi)
   WiFi.mode(WIFI_STA);
   WiFi.hostname(deviceName);
-  WiFi.begin(WIFI_SSID, WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
   const int8_t wifi_res = WiFi.waitForConnectResult(3e6); // timeout 3e6 = 3 seconds
   SER.printf("WiFi wifi_res: %d\n", wifi_res);
 
