@@ -91,7 +91,7 @@ void ota_update_error(int err)
 
 
 WiFiClient wifiClient;
-PubSubClient client(wifiClient);
+PubSubClient mqttClient(wifiClient);
 VitoWiFi_setProtocol(KW);
 
 ///------------------------------------------------------------------
@@ -199,17 +199,17 @@ bool mqtt_connect(const char* clientId, const uint8 n_attempts = 3)
   SER.print(F("Attempting MQTT connection..."));
   for (size_t i = 0; i < n_attempts; i++)
   {
-    if (client.connected())
+    if (mqttClient.connected())
     {
       return true;
     }
-    if (client.connect(clientId, MQTT_USER, MQTT_PASS))
+    if (mqttClient.connect(clientId, MQTT_USER, MQTT_PASS))
     {
       SER.println(F("connected."));
     }
     else
     {
-      SER.printf("failed, rc=%d\n", client.state());
+      SER.printf("failed, rc=%d\n", mqttClient.state());
       delay(1000);
     }
   }
@@ -226,7 +226,7 @@ void globalCallbackHandler(const IDatapoint &dp, DPValue value)
   // MQTT
   char topic[50];
   snprintf(topic, 50, "tele/VitoWiFi/%s", dp.getName());
-  client.publish(topic, value_str);
+  mqttClient.publish(topic, value_str);
 
   // increment processing counter
   SER.printf("iDpProcessed: %d\n", iDpProcessed);
@@ -254,10 +254,6 @@ void setup()
     // diagnostic output from WiFi libraries
     SER.setDebugOutput(true);
 
-    ////// VitoWiFi diagnostic messages
-    ////VitoWiFi.setLogger(Serial1);
-    ////VitoWiFi.enableLogger();
-
     delay(1000);
     SER.printf("%s\n", ESP.getFullVersion().c_str());
     // https://arduino-esp8266.readthedocs.io/en/latest/boards.html#boot-messages-and-modes
@@ -272,7 +268,7 @@ void setup()
   WiFi.mode(WIFI_STA);
   WiFi.hostname(deviceName);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  const int8_t wifi_res = WiFi.waitForConnectResult(10 * 1e6); // timeout 10 * 1e6 = 10 seconds
+  int8_t wifi_res = WiFi.waitForConnectResult(5e6); // timeout 5e6 = 5 seconds
   SER.printf("WiFi wifi_res: %d\n", wifi_res);
 
   // uint8_t i = 0;
@@ -294,13 +290,13 @@ void setup()
       ESPhttpUpdate.onEnd(ota_update_finished);
       ESPhttpUpdate.onProgress(ota_update_progress);
       ESPhttpUpdate.onError(ota_update_error);
-      WiFiClient client;
+      WiFiClient mqttClient;
       MDNS.setHostname(deviceName);
       MDNS.begin(deviceName);
-      t_httpUpdate_return ret = ESPhttpUpdate.update(client, OTA_URL, OTA_VERSION);
+      t_httpUpdate_return ret = ESPhttpUpdate.update(mqttClient, OTA_URL, OTA_VERSION);
       switch (ret)
-      {
       case HTTP_UPDATE_FAILED:
+      {
         SER.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
         break;
 
@@ -318,10 +314,10 @@ void setup()
     } // OTA
 
     // MQTT setup/connection
-    client.setServer(MQTT_HOST, MQTT_PORT);
+    mqttClient.setServer(MQTT_HOST, MQTT_PORT);
     if (mqtt_connect(deviceName, 3))
     {
-      client.publish("tele/VitoWiFi/ip", WiFi.localIP().toString().c_str());
+      mqttClient.publish("tele/VitoWiFi/ip", WiFi.localIP().toString().c_str());
 
       // VitoWiFi setup
       // this callback will be used for all DPs without specific callback
@@ -355,7 +351,7 @@ void setup()
       iDpProcessed = 0;
 
       // MQTT disconnect
-      client.disconnect();
+      mqttClient.disconnect();
     } // mqtt
 
     delay(50);
