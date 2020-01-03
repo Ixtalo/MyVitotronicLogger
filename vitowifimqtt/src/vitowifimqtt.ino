@@ -49,7 +49,8 @@ const char* deviceName = "ESP-VitoWiFi";
 
 
 // OTA update settings
-#define OTA_URL "http://musca.local:8266/firmware.bin"
+//#define OTA_URL "http://musca.local:8266/firmware.bin"
+#define OTA_URL "http://192.168.3.1:8266/firmware.bin"
 #define OTA_VERSION ""
 
 // OTA signing
@@ -274,6 +275,36 @@ void setup()
 
   if (WiFi.status() == WL_CONNECTED)
   {
+    // OTA
+    {
+      Update.installSignature(&hash, &sign);
+      ESPhttpUpdate.rebootOnUpdate(true);
+      ESPhttpUpdate.onStart(ota_update_started);
+      ESPhttpUpdate.onEnd(ota_update_finished);
+      ESPhttpUpdate.onProgress(ota_update_progress);
+      ESPhttpUpdate.onError(ota_update_error);
+      WiFiClient client;
+      MDNS.setHostname(deviceName);
+      MDNS.begin(deviceName);
+      t_httpUpdate_return ret = ESPhttpUpdate.update(client, OTA_URL, OTA_VERSION);
+      switch (ret)
+      {
+      case HTTP_UPDATE_FAILED:
+        SER.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+        break;
+
+      case HTTP_UPDATE_NO_UPDATES:
+        SER.println("HTTP_UPDATE_NO_UPDATES");
+        break;
+
+      case HTTP_UPDATE_OK:
+        SER.println("HTTP_UPDATE_OK");
+        break;
+      }
+      SER.flush();
+      delay(100);
+    } // OTA
+
     // MQTT setup/connection
     client.setServer(MQTT_HOST, MQTT_PORT);
     if (mqtt_connect(deviceName, 3))
@@ -315,38 +346,6 @@ void setup()
       // MQTT disconnect
       client.disconnect();
     } // mqtt
-
-
-    // OTA
-    {
-      Update.installSignature(&hash, &sign);
-      ESPhttpUpdate.rebootOnUpdate(true);
-      ESPhttpUpdate.onStart(ota_update_started);
-      ESPhttpUpdate.onEnd(ota_update_finished);
-      ESPhttpUpdate.onProgress(ota_update_progress);
-      ESPhttpUpdate.onError(ota_update_error);
-      WiFiClient client;
-      MDNS.setHostname(deviceName);
-      MDNS.begin(deviceName);
-      t_httpUpdate_return ret = ESPhttpUpdate.update(client, OTA_URL, OTA_VERSION);
-      switch (ret)
-      {
-      case HTTP_UPDATE_FAILED:
-        SER.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-        break;
-
-      case HTTP_UPDATE_NO_UPDATES:
-        SER.println("HTTP_UPDATE_NO_UPDATES");
-        break;
-
-      case HTTP_UPDATE_OK:
-        SER.println("HTTP_UPDATE_OK");
-        break;
-      }
-      SER.flush();
-      delay(1000);
-    } // OTA
-
 
     delay(50);
     WiFi.disconnect();
