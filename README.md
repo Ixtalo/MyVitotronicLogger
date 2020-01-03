@@ -47,14 +47,14 @@ Requirements
 
 Circuit / Wiring
 ----------------
-![Breadboard](doc/WemosD1MiniVitoOptocoupler_bb.jpg)  
+![Breadboard](doc/Setup/WemosD1MiniVitoOptocoupler_bb.jpg)  
 
-![Schematic](doc/WemosD1MiniVitoOptocoupler_schem.jpg)
+![Schematic](doc/Setup/WemosD1MiniVitoOptocoupler_schem.jpg)
 
-![Wiring](doc/OptolinkESP8266.png)  
+![Wiring](doc/Setup/OptolinkESP8266.png)  
 (See also https://github.com/openv/openv/wiki/Bauanleitung-ESP8266)  
 
-![Sensor](doc/optocoupler.jpg "Breadboard Prototype")
+![Sensor](doc/Setup/optocoupler.jpg "Breadboard Prototype")
 
 
 
