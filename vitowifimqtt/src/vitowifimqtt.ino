@@ -229,6 +229,7 @@ void globalCallbackHandler(const IDatapoint &dp, DPValue value)
   client.publish(topic, value_str);
 
   // increment processing counter
+  SER.printf("iDpProcessed: %d\n", iDpProcessed);
   iDpProcessed++;
 }
 
@@ -267,11 +268,21 @@ void setup()
 
   // start WiFi connection
   // (automatic reconnection tries is done by ESP8266WiFi)
+  SER.println("Connecting WiFi ...");
   WiFi.mode(WIFI_STA);
   WiFi.hostname(deviceName);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  const int8_t wifi_res = WiFi.waitForConnectResult(3e6); // timeout 3e6 = 3 seconds
+  const int8_t wifi_res = WiFi.waitForConnectResult(10 * 1e6); // timeout 10 * 1e6 = 10 seconds
   SER.printf("WiFi wifi_res: %d\n", wifi_res);
+
+  // uint8_t i = 0;
+  // while ((WiFi.status() != WL_CONNECTED) || (i < 20)) {
+  //   SER.print(".");
+  //   delay(250);
+  //   i++;
+  // }
+  // SER.printf("WiFi status: %d\n", WiFi.status());
+
 
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -302,6 +313,7 @@ void setup()
         break;
       }
       SER.flush();
+      MDNS.end();
       delay(100);
     } // OTA
 
@@ -332,8 +344,7 @@ void setup()
       // i.e., must give VitoWiFi a chance to process all datapoints
       const unsigned long tstart = millis();
       const unsigned long max_duration_sec = 10 * 1000UL;
-      //while ()
-      while( (iDpProcessed < numDp) || (millis() - tstart <= max_duration_sec) )
+      while( (iDpProcessed <= numDp) || (millis() - tstart <= max_duration_sec) )
       {
         // this processes all datapoints, the previously definde callback
         // is being called for each defined datapoint
@@ -352,10 +363,14 @@ void setup()
   } // wifi
 
   delay(50);
-  SER.println(F("DeepSleep!"));
   // 1e6 = 1.000.000 msec = 1 second
-  // 6e8 = 10 * 60 * 1e6 msec = 600 sec = 10 min
-  ESP.deepSleep(6e8);
+  long sleepTime = 600 * 1e6;  // 10 min
+  if (debug) {
+    sleepTime = 60 * 1e6; // 1 min
+    SER.printf("DeepSleep! (%.1f sec)\n", sleepTime / 1e6f);
+  }
+  // Deep sleep mode, the ESP8266 wakes up by itself when GPIO 16 (D0) is connected to the RESET pin
+  ESP.deepSleep(sleepTime);
 }
 
 void loop()
