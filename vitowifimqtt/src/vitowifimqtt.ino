@@ -41,29 +41,19 @@ const char *deviceName = "ESP-VitoWiFi";
 #include "SensorNodeMqttSettings.h"
 
 // OTA update settings
-//#define OTA_URL "http://musca.local:8266/firmware.bin"
-#define OTA_PROTOCOL "http"
-#define OTA_HOST "192.168.99.1"
-#define OTA_PORT 8266
-#define OTA_PATH "firmware.bin"
-#define OTA_VERSION ""
+// #define OTA_HOST "192.168.99.1"
+// #define OTA_PROTOCOL "http"
+// #define OTA_PORT 8266
+// #define OTA_PATH "firmware.bin"
+// #define OTA_VERSION ""
+#include "OtaSettings.h"
 
 // OTA signing
-const char pubkey[] PROGMEM = R"EOF(
------BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw41BEMOgGz2AktKMETlH
-nVLDDxGr/CxRJWL4FEqJz5k2zLDWQdUQGUGsD0lYNS5mV3kz+W83U4Qh3VpHRlnn
-J0/4yXOLo46KR3+MqlHXbiyOMBZdi0/i+OP8octQDGLb880hNhHt6Ix0CtdHKsaQ
-ju6gIcKcz2VXbDV4AZ0qRqrj85vAx+Vl5j/dHOzQKJy43XHZD/RuEkjjjqsXIZe6
-NdVKMGjNMYzRF1y7NME6PHQicIuFjd9pwdrlGWgYwdKIC5OVKrHrEG/DnQ0gH7lw
-fLqKojGgTEJSBtZKEjcAM6VhnGJ5ra2KwcRnyOFbpHQBTRwPzSuLdxywWCyJ8Xmy
-TQIDAQAB
------END PUBLIC KEY-----
-)EOF";
 BearSSL::PublicKey signPubKey(pubkey);
 BearSSL::HashSHA256 hash;
 BearSSL::SigningVerifier sign(&signPubKey);
 
+// OTA callbacks
 void ota_update_started()
 {
   SER.println("[OTA]  HTTP update process started");
@@ -353,7 +343,7 @@ void setup()
     // https://arduino-esp8266.readthedocs.io/en/latest/boards.html#boot-messages-and-modes
     SER.printf("Boot mode: %d\n", ESP.getBootMode());
     SER.printf("Reset reason: %s\n", ESP.getResetReason().c_str());
-    SER.printf("tstart: %d\n", tstart);
+    SER.printf("tstart: %lu\n", tstart);
   }
 
   // start WiFi connection
@@ -366,7 +356,7 @@ void setup()
   // try to establish WiFi connection and get DHCP address
   // result: wl_status_t or -1 on timeout
   int8_t wifi_res = WiFi.waitForConnectResult(10000); // timeout 10 seconds (in milliseconds)
-  SER.printf("WiFi connect result time: %d\n", (millis() - wifiConStart));
+  SER.printf("WiFi connect result time: %lu\n", (millis() - wifiConStart));
   SER.printf("WiFi wifi_res: %d\n", wifi_res);
 
   if (WiFi.isConnected())
