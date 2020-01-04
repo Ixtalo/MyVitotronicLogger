@@ -14,20 +14,19 @@
 #include <PubSubClient.h> // MQTT, https://pubsubclient.knolleary.net/
 #include <VitoWiFi.h>     // https://github.com/bertmelis/VitoWiFi.git
 
-
 // define an own macro for serial output which is only active
 // if boolean debug variable is true
 // this reduced the CPU time used for printing debug output
-#define SER if(debug)Serial1
+#define SER if (debug) Serial1
 
 // debug mode activation switch
-// it is set in setup() and can be set via hardware 
+// it is set in setup() and can be set via hardware
 // by wiring DEBUG_PIN to ground
 #define DEBUG_PIN D1
-bool debug = false;   // possible changed in setup()
+bool debug = false; // possible changed in setup()
 
 // hostname/clientId
-const char* deviceName = "ESP-VitoWiFi";
+const char *deviceName = "ESP-VitoWiFi";
 
 // declare WIFI_SSID in external header file
 // const char* WIFI_SSID = "...";
@@ -41,16 +40,12 @@ const char* deviceName = "ESP-VitoWiFi";
 // const char* MQTT_PASS = "...";
 #include "SensorNodeMqttSettings.h"
 
-//// WiFi static IP configuration (instead of DHCP)
-//const IPAddress staticIP(192, 168, 3, 8);
-//const IPAddress gateway(192, 168, 3, 1);
-//const IPAddress subnet(255, 255, 255, 0);
-//const IPAddress dns(gateway);
-
-
 // OTA update settings
 //#define OTA_URL "http://musca.local:8266/firmware.bin"
-#define OTA_URL "http://192.168.3.1:8266/firmware.bin"
+#define OTA_PROTOCOL "http"
+#define OTA_HOST "192.168.99.1"
+#define OTA_PORT 8266
+#define OTA_PATH "firmware.bin"
 #define OTA_VERSION ""
 
 // OTA signing
@@ -67,7 +62,7 @@ TQIDAQAB
 )EOF";
 BearSSL::PublicKey signPubKey(pubkey);
 BearSSL::HashSHA256 hash;
-BearSSL::SigningVerifier sign( &signPubKey );
+BearSSL::SigningVerifier sign(&signPubKey);
 
 void ota_update_started()
 {
@@ -89,18 +84,12 @@ void ota_update_error(int err)
   SER.printf("[OTA]  HTTP update fatal error code %d\n", err);
 }
 
-
-WiFiClient wifiClient;
-PubSubClient mqttClient(wifiClient);
-VitoWiFi_setProtocol(KW);
-
 ///------------------------------------------------------------------
 /// Data Points
 ///------------------------------------------------------------------
 /// Vitotronik 200 Typ KW1
 /// https://github.com/openv/openv/wiki/Adressen
 /// kd_list_nr2_20110719.pdf, "Datenpunktliste Vitotronic 200-H; 050 (Typ HK1W)_20AA"
-
 
 // number of datapoints (must be identical to the defined variables)
 const uint8_t numDp = 17;
@@ -155,7 +144,6 @@ DPTemp setRoomTemp("setRoomTemp", "temperature", 0x2306); // 1-Byte, 3..37
 // Reduizierte Raumtemperatur Soll [RW]
 DPTemp setRoomReducedTemp("setRoomReducedTemp", "temperature", 0x2307); // 1-Byte, 3..37
 
-
 // 0x55E3 1-byte aktuelle Leistung %
 // DOES NOT SEEM TO WORK, ALWAYS 255// DPMode currentPower("currentPower", "operation", 0x55E3);
 // 0x5555 1-byte Drosselklappenposition (0..100%)
@@ -167,7 +155,6 @@ DPTemp setRoomReducedTemp("setRoomReducedTemp", "temperature", 0x2307); // 1-Byt
 // DOES NOT WORK (-0.1) DPTemp setBoilerTemp("setBoilerTemp", "temperature", 0x555A); // 2-Byte
 // DOES NOT WORK (-0.1) DPTemp setExtRoomTemp("setExtRoomTemp", "temperature", 0x2321);
 // DOES NOT WORK (255) DPMode operatingMode("operatingMode", "operation", 0x2323); // 1-Byte, 0..3
-
 
 /*
 Example output:
@@ -193,10 +180,17 @@ pump - circuitPump is false
 ///------------------------------------------------------------------
 ///------------------------------------------------------------------
 
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+VitoWiFi_setProtocol(KW);
+const ulong vitoTimeout = 10 * 1000UL; // max 10 sec 
+bool vitoDoRead = false;
+ulong tstart = 0;
 
-bool mqtt_connect(const char* clientId, const uint8 n_attempts = 3)
+bool mqtt_connect(const char *clientId, const uint8 n_attempts = 3)
 {
   SER.print(F("Attempting MQTT connection..."));
+  SER.flush();
   for (size_t i = 0; i < n_attempts; i++)
   {
     if (mqttClient.connected())
@@ -212,6 +206,7 @@ bool mqtt_connect(const char* clientId, const uint8 n_attempts = 3)
       SER.printf("failed, rc=%d\n", mqttClient.state());
       delay(1000);
     }
+    SER.flush();
   }
   return false;
 }
@@ -230,7 +225,105 @@ void globalCallbackHandler(const IDatapoint &dp, DPValue value)
 
   // increment processing counter
   SER.printf("iDpProcessed: %d\n", iDpProcessed);
+  SER.flush();
   iDpProcessed++;
+}
+
+void ota_check()
+{
+  SER.println("OTA update check ...");
+  Update.installSignature(&hash, &sign);
+  ESPhttpUpdate.rebootOnUpdate(true);
+  ESPhttpUpdate.onStart(ota_update_started);
+  ESPhttpUpdate.onEnd(ota_update_finished);
+  ESPhttpUpdate.onProgress(ota_update_progress);
+  ESPhttpUpdate.onError(ota_update_error);
+  
+  // MDNS.setHostname(deviceName);
+  // MDNS.begin(deviceName);
+
+  char ota_url[255];
+  sprintf(ota_url, "%s://%s:%d/%s", OTA_PROTOCOL, OTA_HOST, OTA_PORT, OTA_PATH);
+  SER.printf("OTA url: %s\n", ota_url);
+
+  wifiClient.setTimeout(2500);  // 2.5 sec
+  if (!wifiClient.connect(OTA_HOST, OTA_PORT)) {
+    SER.println("No TCP connection to OTA host!");
+  } 
+  else
+  {
+    t_httpUpdate_return ret = ESPhttpUpdate.update(wifiClient, ota_url, OTA_VERSION);
+    switch (ret)
+    case HTTP_UPDATE_FAILED:
+    {
+      SER.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+      break;
+
+    case HTTP_UPDATE_NO_UPDATES:
+      SER.println("HTTP_UPDATE_NO_UPDATES");
+      break;
+
+    case HTTP_UPDATE_OK:
+      SER.println("HTTP_UPDATE_OK");
+      break;
+    }
+  }
+  
+  // MDNS.end();
+
+  SER.println("OTA update check END.");
+  SER.flush();
+}
+
+void cleanup_and_sleep()
+{
+  if (mqttClient.connected())
+  {
+    SER.println("MQTT disconnect ...");
+    mqttClient.disconnect();
+  }
+  if (WiFi.isConnected())
+    SER.println("WiFi disconnect ...");
+    WiFi.disconnect();
+
+  // 1e6 = 1.000.000 us = 1 second
+  ulong sleepTime = 600 * 1e6; // 10 min
+  if (debug)
+  {
+    sleepTime = 30 * 1e6; // 30 sec
+    SER.printf("DeepSleep! (%.1f sec)\n", sleepTime / 1e6f);
+    SER.flush();
+  }
+
+  // Deep sleep mode, the ESP8266 wakes up by itself when
+  // GPIO 16 (D0) is connected to the RESET pin.
+  // sleepTime in micro-seconds
+  ESP.deepSleep(sleepTime);
+  //
+  // next awakening the ESP starts again with setup()
+  //
+}
+
+void setupVitoWiFi()
+{
+  // VitoWiFi setup
+  // this callback will be used for all DPs without specific callback
+  // must be set after adding at least 1 datapoint
+  VitoWiFi.setGlobalCallback(globalCallbackHandler);
+  
+  // use the main serial port
+  // (debug output must go to Serial1)
+  VitoWiFi.setup(&Serial);
+  
+  if (debug)
+  {
+    VitoWiFi.setLogger(&Serial1);
+    VitoWiFi.enableLogger();
+  }
+
+  //
+  // VitoWiFi reading continous in loop()
+  //
 }
 
 void setup()
@@ -242,7 +335,8 @@ void setup()
   pinMode(DEBUG_PIN, INPUT_PULLUP);
   debug = 1 - digitalRead(DEBUG_PIN);
 
-  if (debug) {
+  if (debug)
+  {
     // Initialize Serial1 (Serial*ONE*) for logging/status output.
     // (not Serial/Serial0 because it is used for communication with boiler!)
     // Serial1 uses UART1 which is a transmit-only UART.
@@ -259,117 +353,67 @@ void setup()
     // https://arduino-esp8266.readthedocs.io/en/latest/boards.html#boot-messages-and-modes
     SER.printf("Boot mode: %d\n", ESP.getBootMode());
     SER.printf("Reset reason: %s\n", ESP.getResetReason().c_str());
+    SER.printf("tstart: %d\n", tstart);
   }
-
 
   // start WiFi connection
   // (automatic reconnection tries is done by ESP8266WiFi)
   SER.println("Connecting WiFi ...");
+  const ulong wifiConStart = millis();
   WiFi.mode(WIFI_STA);
   WiFi.hostname(deviceName);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  int8_t wifi_res = WiFi.waitForConnectResult(5e6); // timeout 5e6 = 5 seconds
+  // try to establish WiFi connection and get DHCP address
+  // result: wl_status_t or -1 on timeout
+  int8_t wifi_res = WiFi.waitForConnectResult(10000); // timeout 10 seconds (in milliseconds)
+  SER.printf("WiFi connect result time: %d\n", (millis() - wifiConStart));
   SER.printf("WiFi wifi_res: %d\n", wifi_res);
 
-  // uint8_t i = 0;
-  // while ((WiFi.status() != WL_CONNECTED) || (i < 20)) {
-  //   SER.print(".");
-  //   delay(250);
-  //   i++;
-  // }
-  // SER.printf("WiFi status: %d\n", WiFi.status());
-
-
-  if (WiFi.status() == WL_CONNECTED)
+  if (WiFi.isConnected())
   {
-    // OTA
-    {
-      Update.installSignature(&hash, &sign);
-      ESPhttpUpdate.rebootOnUpdate(true);
-      ESPhttpUpdate.onStart(ota_update_started);
-      ESPhttpUpdate.onEnd(ota_update_finished);
-      ESPhttpUpdate.onProgress(ota_update_progress);
-      ESPhttpUpdate.onError(ota_update_error);
-      WiFiClient mqttClient;
-      MDNS.setHostname(deviceName);
-      MDNS.begin(deviceName);
-      t_httpUpdate_return ret = ESPhttpUpdate.update(mqttClient, OTA_URL, OTA_VERSION);
-      switch (ret)
-      case HTTP_UPDATE_FAILED:
-      {
-        SER.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-        break;
-
-      case HTTP_UPDATE_NO_UPDATES:
-        SER.println("HTTP_UPDATE_NO_UPDATES");
-        break;
-
-      case HTTP_UPDATE_OK:
-        SER.println("HTTP_UPDATE_OK");
-        break;
-      }
-      SER.flush();
-      MDNS.end();
-      delay(100);
-    } // OTA
+    ota_check();
 
     // MQTT setup/connection
     mqttClient.setServer(MQTT_HOST, MQTT_PORT);
     if (mqtt_connect(deviceName, 3))
     {
       mqttClient.publish("tele/VitoWiFi/ip", WiFi.localIP().toString().c_str());
-
-      // VitoWiFi setup
-      // this callback will be used for all DPs without specific callback
-      // must be set after adding at least 1 datapoint
-      VitoWiFi.setGlobalCallback(globalCallbackHandler);
-      // use the main serial port
-      // (debug output must go to Serial1)
-      VitoWiFi.setup(&Serial);
-      if (debug)
-      {
-        VitoWiFi.setLogger(&Serial1);
-        VitoWiFi.enableLogger();
-      }
-
-      SER.println(F("Vitotronic reading..."));
-      delay(500);
-      VitoWiFi.readAll();
-
-      // simulate Arduino "loop()" function
-      // i.e., must give VitoWiFi a chance to process all datapoints
-      const unsigned long tstart = millis();
-      const unsigned long max_duration_sec = 10 * 1000UL;
-      while( (iDpProcessed <= numDp) || (millis() - tstart <= max_duration_sec) )
-      {
-        // this processes all datapoints, the previously definde callback
-        // is being called for each defined datapoint
-        VitoWiFi.loop();
-      }
-
-      // reset the counter
-      iDpProcessed = 0;
-
-      // MQTT disconnect
-      mqttClient.disconnect();
-    } // mqtt
-
-    delay(50);
-    WiFi.disconnect();
+      mqttClient.publish("tele/VitoWiFi/rssi", String(WiFi.RSSI()).c_str());
+      setupVitoWiFi();
+      vitoDoRead = true;
+    }
   } // wifi
 
-  delay(50);
-  // 1e6 = 1.000.000 msec = 1 second
-  long sleepTime = 600 * 1e6;  // 10 min
-  if (debug) {
-    sleepTime = 60 * 1e6; // 1 min
-    SER.printf("DeepSleep! (%.1f sec)\n", sleepTime / 1e6f);
-  }
-  // Deep sleep mode, the ESP8266 wakes up by itself when GPIO 16 (D0) is connected to the RESET pin
-  ESP.deepSleep(sleepTime);
+  if (!vitoDoRead)
+    // not handling VitoWiFi, probably because no WiFi or no MQTT
+    cleanup_and_sleep();
 }
 
 void loop()
 {
-  // not used because of DeepSleep
+  if (vitoDoRead)
+  {
+    SER.println(F("Initialize Vitotronic reading..."));
+    SER.flush();
+    // initiate the reading for each defined datapoint
+    VitoWiFi.readAll();
+    vitoDoRead = false;
+    tstart = millis();
+  }
+
+  if (iDpProcessed > numDp)
+  {
+    SER.println("All DPs proccessed.");
+    cleanup_and_sleep();
+  }
+  else if (tstart > 0 && (millis() - tstart > vitoTimeout))
+  {
+    SER.println("Timeout hit! STOP.");
+    SER.println(millis() - tstart);
+    cleanup_and_sleep();
+  }
+
+  // this processes all datapoints, the previously definde callback
+  // is being called for each defined datapoint
+  VitoWiFi.loop();
 }
