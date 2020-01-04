@@ -23,7 +23,7 @@
 // it is set in setup() and can be set via hardware
 // by wiring DEBUG_PIN to ground
 #define DEBUG_PIN D1
-bool debug = false; // possible changed in setup()
+bool debug = false; // possibly changed in setup()
 
 // hostname/clientId
 const char *deviceName = "ESP-VitoWiFi";
@@ -48,31 +48,6 @@ const char *deviceName = "ESP-VitoWiFi";
 // #define OTA_VERSION ""
 #include "OtaSettings.h"
 
-// OTA signing
-BearSSL::PublicKey signPubKey(pubkey);
-BearSSL::HashSHA256 hash;
-BearSSL::SigningVerifier sign(&signPubKey);
-
-// OTA callbacks
-void ota_update_started()
-{
-  SER.println("[OTA]  HTTP update process started");
-}
-
-void ota_update_finished()
-{
-  SER.println("[OTA]  HTTP update process finished");
-}
-
-void ota_update_progress(int cur, int total)
-{
-  SER.printf("\r[OTA]  HTTP update process at %d of %d bytes...", cur, total);
-}
-
-void ota_update_error(int err)
-{
-  SER.printf("[OTA]  HTTP update fatal error code %d\n", err);
-}
 
 ///------------------------------------------------------------------
 /// Data Points
@@ -176,6 +151,32 @@ VitoWiFi_setProtocol(KW);
 const ulong vitoTimeout = 10 * 1000UL; // max 10 sec 
 bool vitoDoRead = false;
 ulong tstart = 0;
+
+// OTA signing
+BearSSL::PublicKey signPubKey(pubkey);
+BearSSL::HashSHA256 hash;
+BearSSL::SigningVerifier sign(&signPubKey);
+
+// OTA callbacks
+void ota_update_started()
+{
+  SER.println("[OTA]  HTTP update process started");
+}
+
+void ota_update_finished()
+{
+  SER.println("[OTA]  HTTP update process finished");
+}
+
+void ota_update_progress(int cur, int total)
+{
+  SER.printf("\r[OTA]  HTTP update process at %d of %d bytes...", cur, total);
+}
+
+void ota_update_error(int err)
+{
+  SER.printf("[OTA]  HTTP update fatal error code %d\n", err);
+}
 
 bool mqtt_connect(const char *clientId, const uint8 n_attempts = 3)
 {
@@ -367,6 +368,7 @@ void setup()
     mqttClient.setServer(MQTT_HOST, MQTT_PORT);
     if (mqtt_connect(deviceName, 3))
     {
+      SER.println(F("MQTT publish ..."));
       mqttClient.publish("tele/VitoWiFi/ip", WiFi.localIP().toString().c_str());
       mqttClient.publish("tele/VitoWiFi/rssi", String(WiFi.RSSI()).c_str());
       setupVitoWiFi();
