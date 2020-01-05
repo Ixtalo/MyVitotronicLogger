@@ -28,25 +28,22 @@ bool debug = false; // possibly changed in setup()
 // hostname/clientId
 const char *deviceName = "ESP-VitoWiFi";
 
-// declare WIFI_SSID in external header file
+// declare credentials and settings in external header file
 // const char* WIFI_SSID = "...";
 // const char* WIFI_PASS = "...";
-#include "WifiCredentials.h"
-
-// MQTT
 // const char* MQTT_HOST = "192.168.3.1";
-// const unsigned int MQTT_PORT = 1883;
+// const uint16_t MQTT_PORT = 1883;
 // const char* MQTT_USER = "...";
 // const char* MQTT_PASS = "...";
-#include "SensorNodeMqttSettings.h"
+// const char* OTA_HOST "192.168.99.1"
+// const char* OTA_PROTOCOL "http"
+// const uint16_t OTA_PORT 8266
+// const char* OTA_PATH "firmware.bin"
+// const char* OTA_VERSION ""
+#define SENSORNODE  // activate MQTT settings
+#define OTA // activate OTA settings
+#include "mysettings.h"
 
-// OTA update settings
-// #define OTA_HOST "192.168.99.1"
-// #define OTA_PROTOCOL "http"
-// #define OTA_PORT 8266
-// #define OTA_PATH "firmware.bin"
-// #define OTA_VERSION ""
-#include "OtaSettings.h"
 
 
 ///------------------------------------------------------------------
